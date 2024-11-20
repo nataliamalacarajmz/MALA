@@ -8,24 +8,31 @@ file_path = "base_datos_productos.xlsx"
 ventas_file = "ventas.xlsx"
 
 # Función para cargar datos de productos
-@st.cache_data
+
 def load_data(file_path):
     try:
         df = pd.read_excel(file_path)
         if 'Ventas' not in df.columns:
-            df['Ventas'] = 0  # Inicializar columna de ventas acumuladas si no existe
+            df['Ventas'] = 0  # Asegúrate de que tenga la columna Ventas
         return df
     except FileNotFoundError:
         st.error("El archivo de base de datos no fue encontrado.")
         return pd.DataFrame()
+
 
 # Función para guardar datos
 def save_data(df, file_path):
     try:
         df.to_excel(file_path, index=False)
         st.success("Datos guardados correctamente.")
+        # Recargar datos después de guardar
+        return load_data(file_path)
     except PermissionError:
         st.error("No se pudo guardar el archivo. Verifica que no esté abierto o revisa los permisos.")
+        return df
+    except Exception as e:
+        st.error(f"Ocurrió un error al guardar el archivo: {e}")
+        return df
 
 # Función para cargar datos de ventas
 def load_ventas():
@@ -134,8 +141,58 @@ def pagina_catalogo():
 
 # Página de gestión de inventario
 def pagina_gestion_inventario():
+    global df  # Usa el DataFrame global
     st.title("📦 Gestión de Inventario")
     st.markdown("Añade o quita inventario de tus productos.")
+
+    if df.empty:
+        st.error("La base de datos de productos está vacía.")
+        return
+
+    # Selección de filtros
+    familia = st.selectbox("Selecciona Familia", options=["Todos"] + list(df['Familia'].unique()))
+    color = st.selectbox("Selecciona Color", options=["Todos"] + list(df['Color'].unique()))
+    talla = st.selectbox("Selecciona Talla", options=["Todos"] + list(df['Talla'].unique()))
+
+    productos_filtrados = df.copy()
+    if familia != "Todos":
+        productos_filtrados = productos_filtrados[productos_filtrados['Familia'] == familia]
+    if color != "Todos":
+        productos_filtrados = productos_filtrados[productos_filtrados['Color'] == color]
+    if talla != "Todos":
+        productos_filtrados = productos_filtrados[productos_filtrados['Talla'] == talla]
+
+    producto_seleccionado = st.selectbox("Selecciona Producto", options=productos_filtrados['CODIGO'])
+
+    # Formulario para actualizar inventario
+    with st.form("form_inventario"):
+        cantidad = st.number_input("Cantidad", min_value=1, step=1)
+        operacion = st.selectbox("Operación", ["Añadir", "Quitar"])
+        submit = st.form_submit_button("Actualizar Inventario")
+
+    if submit:
+        if producto_seleccionado in df['CODIGO'].values:
+            idx = df[df['CODIGO'] == producto_seleccionado].index[0]
+            if operacion == "Añadir":
+                df.loc[idx, 'Inventario'] += cantidad
+                st.success(f"Se añadieron {cantidad} unidades a {producto_seleccionado}.")
+            elif operacion == "Quitar" and df.loc[idx, 'Inventario'] >= cantidad:
+                df.loc[idx, 'Inventario'] -= cantidad
+                st.success(f"Se quitaron {cantidad} unidades de {producto_seleccionado}.")
+            else:
+                st.error(f"No hay suficiente inventario para quitar {cantidad} unidades.")
+
+            # Guardar y recargar datos
+            df = save_data(df, file_path)
+        else:
+            st.error("El producto seleccionado no existe en la base de datos.")
+
+# Página de registro de ventas
+def pagina_gestion_inventario():
+    global df  # Asegúrate de que 'df' sea global
+    st.title("📦 Gestión de Inventario")
+    st.markdown("Añade o quita inventario de tus productos.")
+    
     if df.empty:
         st.error("La base de datos de productos está vacía.")
         return
@@ -171,20 +228,27 @@ def pagina_gestion_inventario():
             elif operacion == "Quitar" and df.loc[idx, 'Inventario'] >= cantidad:
                 df.loc[idx, 'Inventario'] -= cantidad
                 st.success(f"Se quitaron {cantidad} unidades de {producto_seleccionado}.")
+            
+            # Guarda los cambios y recarga los datos
             save_data(df, file_path)
+            df = load_data(file_path)  # Recargar los datos para que estén actualizados
+        else:
+            st.error("El producto seleccionado no existe en la base de datos.")
 
-# Página de registro de ventas
 def pagina_registro_ventas():
-    global ventas_acumuladas  # Asegura que uses la variable global
+    global df, ventas_acumuladas
     st.title("🛒 Registro de Ventas")
     st.markdown("Registra las ventas de tus productos aquí.")
 
-    # Filtros
+    if df.empty:
+        st.error("La base de datos de productos está vacía.")
+        return
+
+    # Selección de filtros
     familia = st.selectbox("Selecciona Familia", options=["Todos"] + list(df['Familia'].unique()))
     color = st.selectbox("Selecciona Color", options=["Todos"] + list(df['Color'].unique()))
     talla = st.selectbox("Selecciona Talla", options=["Todos"] + list(df['Talla'].unique()))
 
-    # Filtrar productos
     productos_filtrados = df.copy()
     if familia != "Todos":
         productos_filtrados = productos_filtrados[productos_filtrados['Familia'] == familia]
@@ -195,13 +259,11 @@ def pagina_registro_ventas():
 
     producto_seleccionado = st.selectbox("Selecciona Producto", options=productos_filtrados['CODIGO'])
 
-    # Mostrar detalles del producto seleccionado
     if not productos_filtrados.empty:
         producto_info = productos_filtrados[productos_filtrados['CODIGO'] == producto_seleccionado]
         st.write("Detalles del Producto:")
         st.table(producto_info[['CODIGO', 'Familia', 'Color', 'Talla', 'Inventario', 'Precio']])
 
-    # Formulario para registrar venta
     with st.form("form_ventas"):
         cantidad = st.number_input("Cantidad Vendida", min_value=1, step=1)
         canal = st.selectbox("Canal de Venta", ["Whatsapp", "Instagram", "Showroom", "Shopify", "Puntos de Venta"])
@@ -211,7 +273,6 @@ def pagina_registro_ventas():
             if producto_seleccionado in df['CODIGO'].values:
                 idx = df[df['CODIGO'] == producto_seleccionado].index[0]
                 if df.loc[idx, 'Inventario'] >= cantidad:
-                    # Actualizar inventario y registrar venta
                     df.loc[idx, 'Inventario'] -= cantidad
                     df.loc[idx, 'Ventas'] += cantidad
 
@@ -224,12 +285,12 @@ def pagina_registro_ventas():
                     ventas_acumuladas = pd.concat([ventas_acumuladas, nueva_venta], ignore_index=True)
                     save_data(df, file_path)
                     save_ventas(ventas_acumuladas)
+                    df = load_data(file_path)  # Recarga datos actualizados
                     st.success(f"Venta registrada: {cantidad} unidades de {producto_seleccionado} por {canal}.")
                 else:
-                    st.error(f"No hay suficiente inventario para vender {cantidad} unidades de {producto_seleccionado}.")
+                    st.error(f"No hay suficiente inventario para vender {cantidad} unidades.")
             else:
                 st.error("El producto seleccionado no existe en la base de datos.")
-
 
 # Página de estadísticas
 def pagina_estadisticas():
