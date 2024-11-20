@@ -175,9 +175,10 @@ def pagina_gestion_inventario():
 
 # Página de registro de ventas
 def pagina_registro_ventas():
+    global ventas_acumuladas  # Asegura que uses la variable global
     st.title("🛒 Registro de Ventas")
     st.markdown("Registra las ventas de tus productos aquí.")
-    
+
     # Filtros
     familia = st.selectbox("Selecciona Familia", options=["Todos"] + list(df['Familia'].unique()))
     color = st.selectbox("Selecciona Color", options=["Todos"] + list(df['Color'].unique()))
@@ -206,7 +207,6 @@ def pagina_registro_ventas():
         canal = st.selectbox("Canal de Venta", ["Whatsapp", "Instagram", "Showroom", "Shopify", "Puntos de Venta"])
         submit = st.form_submit_button("Registrar Venta")
 
-        # Este bloque debe estar correctamente indentado
         if submit:
             if producto_seleccionado in df['CODIGO'].values:
                 idx = df[df['CODIGO'] == producto_seleccionado].index[0]
