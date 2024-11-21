@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import seaborn as sns 
 
 # Archivos de datos
 file_path = "base_datos_productos.xlsx"
@@ -57,7 +58,6 @@ ventas_acumuladas = load_ventas()  # Datos de ventas
 if df.empty:
     st.warning("La base de datos de productos está vacía o no se pudo cargar.")
 
-#pagina de incio
 def pagina_inicio():
     # CSS para diseño visual
     st.markdown("""
@@ -71,13 +71,17 @@ def pagina_inicio():
         margin-top: 20px;
     }
     .brand-name {
-        font-size: 3rem; /* Tamaño del nombre de la marca */
+        font-size: 3rem;
         font-weight: bold;
-        color: #495057; /* Color del texto principal */
+        color: #495057;
         margin-bottom: 10px;
+        transition: color 0.3s ease-in-out;
+    }
+    .brand-name:hover {
+        color: #007BFF;
     }
     .slogan {
-        font-size: 1.8rem; /* Tamaño del slogan */
+        font-size: 1.8rem;
         font-weight: lighter;
         color: #6c757d;
         margin-bottom: 30px;
@@ -94,6 +98,35 @@ def pagina_inicio():
         object-fit: cover;
         border-radius: 10px;
     }
+    .cta-button {
+        display: inline-block;
+        padding: 15px 30px;
+        font-size: 1.2rem;
+        color: #fff;
+        background-color: #333333; /* Gris oscuro */
+        text-decoration: none;
+        border-radius: 30px;
+        margin-top: 20px;
+        font-weight: bold;
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease-in-out;
+    }
+    .cta-button:hover {
+        background-color: #555555; /* Gris más claro al pasar el cursor */
+        box-shadow: 0px 6px 8px rgba(0, 0, 0, 0.2);
+        transform: translateY(-3px);
+    }
+    .testimonial {
+        font-size: 1.5rem;
+        font-style: italic;
+        color: #6c757d;
+        margin-top: 20px;
+    }
+    .testimonial-author {
+        font-size: 1.2rem;
+        color: #495057;
+        margin-bottom: 20px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -102,7 +135,7 @@ def pagina_inicio():
     <div class="centered">
         <div class="brand-name">MALA</div>
         <div class="slogan">Effortless Wear</div>
-        <p style="font-size: 1.2rem; color: #6c757d;">"made and inspired by modern women"</p>
+        <p style="font-size: 1.2rem; color: #6c757d;">"Made and inspired by modern women"</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -118,26 +151,73 @@ def pagina_inicio():
     # Separador visual
     st.markdown("---")
 
-    # Texto motivador
+    # Texto motivador con botón
     st.markdown("""
     <div class="centered">
-        <h2 style="color: #495057;">Explora nuestras herramientas</h2>
-        <p>Registra tus ventas, gestiona inventarios y analiza tus estadísticas con estilo.</p>
+        <p class="testimonial">"Vestir bien nunca fue tan fácil como con MALA."</p>
+        <p class="testimonial-author">- Una clienta satisfecha</p>
+        <a href="https://malaeffortlesswear.com/" target="_blank" class="cta-button">
+            Ir a nuestra Página Web
+        </a>
     </div>
     """, unsafe_allow_html=True)
+
+#Catalogo
 
 def pagina_catalogo():
     st.title("📋 Catálogo de Productos")
     st.markdown("Aquí puedes visualizar y buscar tus productos.")
+
     if df.empty:
         st.error("La base de datos de productos está vacía.")
+        return
+
+    # Buscador y filtros
+    buscador = st.text_input("Buscar producto (código, descripción, color, etc.)")
+    familia_filtro = st.selectbox("Filtrar por Familia", options=["Todos"] + list(df['Familia'].unique()))
+    rango_precio = st.slider("Filtrar por Rango de Precio", min_value=int(df['Precio'].min()), 
+                             max_value=int(df['Precio'].max()), value=(int(df['Precio'].min()), int(df['Precio'].max())))
+
+    # Filtrar productos
+    productos_filtrados = df.copy()
+    if buscador:
+        # Filtrar por múltiples columnas
+        productos_filtrados = productos_filtrados[
+            productos_filtrados['CODIGO'].str.contains(buscador, na=False, case=False) |
+            productos_filtrados['Familia'].str.contains(buscador, na=False, case=False) |
+            productos_filtrados['Color'].str.contains(buscador, na=False, case=False) |
+            productos_filtrados['Talla'].str.contains(buscador, na=False, case=False)
+        ]
+    if familia_filtro != "Todos":
+        productos_filtrados = productos_filtrados[productos_filtrados['Familia'] == familia_filtro]
+    productos_filtrados = productos_filtrados[
+        (productos_filtrados['Precio'] >= rango_precio[0]) & (productos_filtrados['Precio'] <= rango_precio[1])
+    ]
+
+    # Mostrar resultados
+    if productos_filtrados.empty:
+        st.warning("No se encontraron productos que coincidan con los filtros.")
     else:
-        st.dataframe(df)
-        buscador = st.text_input("Buscar producto por código o descripción")
-        if buscador:
-            resultados = df[df['CODIGO'].str.contains(buscador, na=False, case=False) |
-                            df['Familia'].str.contains(buscador, na=False, case=False)]
-            st.dataframe(resultados)
+        st.markdown("### Resultados del Catálogo:")
+        for _, producto in productos_filtrados.iterrows():
+            st.markdown(f"""
+            <div style="
+                border: 1px solid #ddd; 
+                border-radius: 10px; 
+                padding: 15px; 
+                margin-bottom: 15px; 
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+                display: flex; 
+                justify-content: space-between; 
+                align-items: center;">
+                <div>
+                    <h4 style="margin: 0; color: #333;">{producto['CODIGO']}</h4>
+                    <p style="margin: 0; color: #666;">{producto['Familia']} - {producto['Color']} - {producto['Talla']}</p>
+                    <p style="margin: 0; font-weight: bold; color: #007BFF;">Precio: ${producto['Precio']:.2f}</p>
+                    <p style="margin: 0; color: #555;">Inventario Disponible: {producto['Inventario']}</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 # Página de gestión de inventario
 def pagina_gestion_inventario():
@@ -235,6 +315,8 @@ def pagina_gestion_inventario():
         else:
             st.error("El producto seleccionado no existe en la base de datos.")
 
+#VENTAS
+
 def pagina_registro_ventas():
     global df, ventas_acumuladas
     st.title("🛒 Registro de Ventas")
@@ -264,6 +346,7 @@ def pagina_registro_ventas():
         st.write("Detalles del Producto:")
         st.table(producto_info[['CODIGO', 'Familia', 'Color', 'Talla', 'Inventario', 'Precio']])
 
+    # Formulario para registrar venta
     with st.form("form_ventas"):
         cantidad = st.number_input("Cantidad Vendida", min_value=1, step=1)
         canal = st.selectbox("Canal de Venta", ["Whatsapp", "Instagram", "Showroom", "Shopify", "Puntos de Venta"])
@@ -292,6 +375,14 @@ def pagina_registro_ventas():
             else:
                 st.error("El producto seleccionado no existe en la base de datos.")
 
+    # Historial de Ventas Recientes
+    st.markdown("---")
+    st.markdown("### Historial de Ventas Recientes:")
+    if not ventas_acumuladas.empty:
+        st.write(ventas_acumuladas.tail(5))
+    else:
+        st.info("No se han registrado ventas todavía.")
+
 # Página de estadísticas
 def pagina_estadisticas():
     global ventas_acumuladas
@@ -309,134 +400,56 @@ def pagina_estadisticas():
         margen_utilidad = (total_utilidad / (ventas_con_info['Precio'] * ventas_con_info['Cantidad']).sum()) * 100
 
         # Producto más vendido
-        producto_mas_vendido = ventas_con_info.groupby('Familia')['Cantidad'].sum().idxmax()
+        productos_vendidos = ventas_con_info.groupby('CODIGO').agg({'Cantidad': 'sum'}).sort_values(by='Cantidad', ascending=False)
+        top_producto = productos_vendidos.head(1).index[0]
+        top_producto_cantidad = productos_vendidos.head(1)['Cantidad'].values[0]
 
-        # Talla más vendida
-        talla_mas_vendida = ventas_con_info.groupby('Talla')['Cantidad'].sum().idxmax()
-
-        # Color más vendido
-        color_mas_vendido = ventas_con_info.groupby('Color')['Cantidad'].sum().idxmax()
-
-        # CSS mejorado para cuadros métricos
-        st.markdown("""
-        <style>
-        .metric-box {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            min-height: 120px;
-            margin-bottom: 20px;
-        }
-        .metric-box h4 {
-            font-size: 1.2rem;
-            margin: 0;
-        }
-        .metric-box h2 {
-            font-size: 2.2rem;
-            margin: 0;
-            color: #495057;
-            word-wrap: break-word;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 100%;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-        # Crear cuadros métricos
+        # Mostrar resumen de ventas en la parte superior
         st.markdown("### **Resumen de Ventas**")
         col1, col2, col3 = st.columns([1, 1, 1], gap="large")
         with col1:
-            st.markdown(f"""
-            <div class="metric-box">
-                <h4>Piezas Vendidas</h4>
-                <h2>{total_ventas}</h2>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric("Piezas Vendidas", total_ventas)
         with col2:
-            st.markdown(f"""
-            <div class="metric-box">
-                <h4>Utilidad Total</h4>
-                <h2>${total_utilidad:,.2f}</h2>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric("Utilidad Total", f"${total_utilidad:,.2f}")
         with col3:
-            st.markdown(f"""
-            <div class="metric-box">
-                <h4>Margen de Utilidad</h4>
-                <h2>{margen_utilidad:.2f}%</h2>
-            </div>
-            """, unsafe_allow_html=True)
+            st.metric("Margen de Utilidad", f"{margen_utilidad:.2f}%")
 
-        col4, col5, col6 = st.columns([1, 1, 1], gap="large")
-        with col4:
-            st.markdown(f"""
-            <div class="metric-box">
-                <h4>Producto Más Vendido</h4>
-                <h2>{producto_mas_vendido}</h2>
-            </div>
-            """, unsafe_allow_html=True)
-        with col5:
-            st.markdown(f"""
-            <div class="metric-box">
-                <h4>Talla Más Vendida</h4>
-                <h2>{talla_mas_vendida}</h2>
-            </div>
-            """, unsafe_allow_html=True)
-        with col6:
-            st.markdown(f"""
-            <div class="metric-box">
-                <h4>Color Más Vendido</h4>
-                <h2>{color_mas_vendido}</h2>
-            </div>
-            """, unsafe_allow_html=True)
+        # Gráfico de pastel: Canales de venta
+        st.markdown("### **Distribución por Canal**")
+        canales_ventas = ventas_acumuladas.groupby('Canal')['Cantidad'].sum()
+        fig1, ax1 = plt.subplots(figsize=(8, 8))
+        colores_grises = sns.color_palette("Greys", len(canales_ventas))  # Tonos grises para el pastel
+        canales_ventas.plot(
+            kind='pie',
+            ax=ax1,
+            autopct='%1.1f%%',
+            startangle=90,
+            colors=colores_grises,
+            wedgeprops={'edgecolor': 'black'}
+        )
+        ax1.set_ylabel("")  # Quitamos la etiqueta del eje Y
+        ax1.set_title("Porcentaje de Ventas por Canal", fontsize=16, weight='bold', color="#333333")
+        st.pyplot(fig1)
 
-        # Gráfico de ventas diarias
-        st.markdown("### **Ventas Diarias**")
-        ventas_acumuladas['Fecha'] = pd.to_datetime(ventas_acumuladas['Fecha'])
-        ventas_diarias = ventas_acumuladas.groupby(ventas_acumuladas['Fecha'].dt.date)['Cantidad'].sum()
-        
-        if len(ventas_diarias) > 1:  # Más de un dato para graficar
-            fig1, ax1 = plt.subplots(figsize=(10, 6))
-            ventas_diarias.plot(kind='line', ax=ax1, marker='o', color='#6c757d')
-            ax1.set_title("Ventas Diarias", fontsize=16, weight='bold')
-            ax1.set_xlabel("Fecha", fontsize=12)
-            ax1.set_ylabel("Cantidad Vendida", fontsize=12)
-            ax1.grid(visible=True, linestyle='--', alpha=0.5)
-            st.pyplot(fig1)
-        else:  # Si solo hay un dato
-            st.warning("No hay suficientes datos para graficar las ventas diarias. Asegúrate de tener múltiples fechas registradas.")
-            st.write("**Datos actuales de ventas diarias:**")
-            st.dataframe(ventas_diarias)
-
-
-
-
-        # Gráfico de ventas por hora
-        st.markdown("### **Ventas por Hora**")
-        ventas_acumuladas['Hora'] = ventas_acumuladas['Fecha'].dt.hour
-        ventas_por_hora = ventas_acumuladas.groupby('Hora')['Cantidad'].sum()
+        # Gráfico de barras: Productos más vendidos
+        st.markdown("### **Productos Más Vendidos**")
         fig2, ax2 = plt.subplots(figsize=(10, 6))
-        ventas_por_hora.plot(kind='bar', ax=ax2, color='#adb5bd', edgecolor='black')
-        ax2.set_title("Ventas por Hora", fontsize=16, weight='bold')
-        ax2.set_xlabel("Hora del Día", fontsize=12)
-        ax2.set_ylabel("Cantidad Vendida", fontsize=12)
-        ax2.grid(visible=False)
+        sns.barplot(
+            x=productos_vendidos.head(10).index,
+            y=productos_vendidos.head(10)['Cantidad'],
+            ax=ax2,
+            palette="Greys_r",  # Barras en tonos grises
+            edgecolor="black"
+        )
+        ax2.set_title("Top 10 Productos Más Vendidos", fontsize=16, weight='bold', color="#333333")
+        ax2.set_xlabel("Código de Producto", fontsize=12, color="#555555")
+        ax2.set_ylabel("Cantidad Vendida", fontsize=12, color="#555555")
+        ax2.grid(visible=True, linestyle='--', alpha=0.5)
         st.pyplot(fig2)
 
-        # Gráfico de pastel para ventas por canal
-        st.markdown("### **Distribución por Canal**")
-        ventas_por_canal = ventas_acumuladas.groupby('Canal')['Cantidad'].sum()
-        fig3, ax3 = plt.subplots(figsize=(8, 8))
-        ventas_por_canal.plot(kind='pie', ax=ax3, autopct='%1.1f%%', startangle=90, colors=['#adb5bd', '#dee2e6', '#ced4da', '#e9ecef'])
-        ax3.set_ylabel("")  # Quitamos la etiqueta del eje Y
-        ax3.set_title("Porcentaje de Ventas por Canal", fontsize=16, weight='bold')
-        st.pyplot(fig3)
+        # Mención del producto más vendido
+        st.markdown(f"**Producto Más Vendido:** {top_producto} con {top_producto_cantidad} unidades.")
+
     else:
         st.warning("No se han registrado ventas todavía.")
 
